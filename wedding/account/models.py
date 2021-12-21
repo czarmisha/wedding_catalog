@@ -1,5 +1,5 @@
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.urls import reverse
 from django.utils.text import slugify
 # from django.db.models.signals import post_save
@@ -7,7 +7,29 @@ from django.utils.text import slugify
 # from django.conf import settings
 
 
+class MyUserManager(BaseUserManager):
+    def create_user(self, email, password, **extra_fields):
+        if not email:
+            raise ValueError('Email for user must be set.')
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save()
+        return user
+
+    def create_superuser(self, email, password, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser must have is_staff=True.')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must have is_superuser=True.')
+        return self.create_user(email, password, **extra_fields)
+
+
 class User(AbstractUser):
+    objects = MyUserManager()
     _TYPES_OF_USER = (
         ('client', 'Клиент'),
         ('specialist', 'Специалист'),
@@ -56,7 +78,7 @@ class District(models.Model):
 class ClientProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     avatar = models.ImageField(upload_to='avatars/', verbose_name='Аватар')
-    phone = models.IntegerField('Телефон', max_length=9)
+    phone = models.IntegerField('Телефон')
     telegram = models.CharField('Телеграм', max_length=50)
     create_date = models.DateTimeField('Дата создания профиля', auto_now_add=True)
 
@@ -77,7 +99,7 @@ class SpecialistProfile(models.Model):
     category = models.ForeignKey('Category', on_delete=models.CASCADE, verbose_name='Категория',
                                  related_name='specialists')
     avatar = models.ImageField(upload_to='avatars/', verbose_name='Аватар')
-    phone = models.IntegerField('Телефон', max_length=9)
+    phone = models.IntegerField('Телефон')
     telegram = models.CharField('Телеграм', max_length=50)
     create_date = models.DateTimeField('Дата создания профиля', auto_now_add=True)
     city = models.ForeignKey('City', on_delete=models.CASCADE, verbose_name='Город')
@@ -92,4 +114,3 @@ class SpecialistProfile(models.Model):
     def save(self, *args, **kwargs):
         self.slug = slugify(self.user.username, instance=self)
         super(SpecialistProfile, self).save(*args, **kwargs)
-
